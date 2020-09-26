@@ -1,0 +1,5 @@
+#!/bin/bash
+cat sahkolinja.geojson|head -n 4 >keskijannite.geojson
+cat sahkolinja.geojson|grep kohdeluokka\"\:\ 22312 >> keskijannite.geojson
+cat sahkolinja.geojson |tail -n 2 >>keskijannite.geojson 
+cat sahkolinja.geojson |tail -n 2 >>keskijannite.geojson 

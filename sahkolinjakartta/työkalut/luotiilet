@@ -1,0 +1,6 @@
+#!/bin/bash
+tippecanoe -e tiles -l keskijannite --maximum-zoom 15 --minimum-zoom 10 keskijannite.geojson
+
+cd tiles
+gzip -d -r -S .pbf *;
+find . -type f -exec mv '{}' '{}'.pbf \;

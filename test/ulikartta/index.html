@@ -1,0 +1,90 @@
+<!-- <!DOCTYPE html> -->
+<!--
+https://raw.githubusercontent.com/teelmo/geodata/master/geojson/Kuntarajat%202017.geojson
+^tohon injektoitu kuntakoodit skriptillä injektoi-json.py
+http://kuntakartta.org/dev.html
+
+-->
+<html>
+    <head>
+        <title>Suomen kunnat</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+        <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script> -->
+        <link rel="stylesheet" href="leaflet.css" />
+        <link rel="stylesheet" href="omat.css" />
+        <script src="js/leaflet.js" ></script>
+        <script type="text/javascript" src="dist/bundle.js"></script>
+        <script type="text/javascript" src="kunnat.js"></script> 
+
+    </head>
+    <body>
+        <div class="split left">
+            <div id='map'></div> 
+        </div>
+
+        <script>
+
+            var map = L.map('map', { zoomControl: false });
+            map.createPane('labels');
+            // This pane is above markers but below popups
+            map.getPane('labels').style.zIndex = 650;
+            // Layers in this pane are non-interactive and do not obscure mouse/touch events
+            map.getPane('labels').style.pointerEvents = 'none';
+
+            var cartodbAttribution='';
+            var positron = L.tileLayer('https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+                attribution: cartodbAttribution }).addTo(map); 
+
+            geojson = L.geoJson(kunnat).addTo(map);
+            geojson.eachLayer(function (layer) {
+                layer.bindPopup(layer.feature.properties.name);
+                layer.on('click', function(ev) { klik(layer.feature.properties.code);});
+                layer.setStyle({fillOpacity: 0.5, color: 'gray', weight: 1});
+            });
+
+            map.setView({ lat: 65.5, lng: 25.2 }, 6);
+
+        </script>
+
+        <br><br>
+
+
+
+        <div class="split right">
+            
+            <select id="karttavalinta" onchange="vaihdaKartta()">
+                <option value='https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'>light_nolabels</option>
+                <option value='https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'>base_light</option>
+                <option value='https://tiles.kartat.kapsi.fi/peruskartta/{z}/{x}/{y}.jpg'>kapsi</option>
+            </select>
+           
+            <a href="ohje.html">ohje</a>
+            <br>
+            <select id="vari">
+                <option value='red' style='background-color:#ea8080'>red</option>
+                <option value='blue' style='background-color:#92b7fe'>blue</option>
+                <option value='green' style='background-color:#96ea96'>green</option>
+                <option value='yellow' style='background-color:#fcfc93'>yellow</option>
+                <option value='gray' style='background-color:gray'>gray</option>
+            </select>
+
+            <button id="keskita" onclick="keskita()">Keskitä kartta</button>
+            <button id="tulosta" onclick="manualPrint()">Tallenna kartta</button>
+            <button onclick="tuoJson()">Tuo JSON</button>
+            <button onclick="tyhjennaKartta()">Tyhjennä</button>
+            <select id="kieli" onchange="luoCheckboxit()">
+                <option value='name'>kieli alkup</option>
+                <option value='nameFi'>kieli fi</option>
+                <option value='nameSv'>kieli sv</option>
+            </select><br><a href="ohje.html">ohje</a><br>
+
+            <br><br>
+            <textarea id="jsondata" rows="10" cols="50">Jsondata</textarea>
+            <br><br>
+            <div id="kuntalista"></div>
+        </div>
+        <script src="js/karttatoiminnot.js"> </script>
+    </body>
+</html>
