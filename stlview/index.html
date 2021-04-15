@@ -10,6 +10,16 @@
 
         <script src="stl_viewer.min.js"></script>        
         <script>
+            
+            function setcamstate(){
+                stl_viewer.set_camera_state({"position":{"x":141, "y":-16603, "z":5229}});
+                console.log("set");
+            }
+            
+            function getcamstate(){
+                var camera_state = stl_viewer.get_camera_state();
+                console.log(camera_state);
+            }
             var stl_viewer=new StlViewer
             (
                 document.getElementById("stl_cont"),
@@ -20,7 +30,14 @@
                     ]
                 }
             );
+            setTimeout(function(){
+                setcamstate();
+            }, 500);
+            
         </script>
-        
+        <!--
+        <button onclick="getcamstate()">get</button>
+        <button onclick="setcamstate()">set</button>
+        -->
     </body>
 </html>
