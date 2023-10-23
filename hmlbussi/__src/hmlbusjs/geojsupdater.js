@@ -10,7 +10,7 @@ const https = require('https');
 const fs = require("fs");
 const { mkdir, writeFile } = require("fs/promises");
 const { isNumber } = require('util');
-const tulostettavat = ["1", "1S", "2", "2U", "3", "3S", "3K", "4", "5", "10", "10T", "11", "13", "14", "14K", "16", "17", "17K"];
+const kaupunkilinjat = ["1", "1S", "2", "2U", "3", "3S", "3K", "4", "5", "10", "10T", "11", "13", "14", "14K", "16", "17", "17K"];
 function writeTextFile(name, content) {
     //content=content.replaceAll("\"", "");
     fs.writeFile(name, content, err => {
@@ -25,7 +25,7 @@ function parseRoutes() {
     let shape_arr = {};
     let trip_arr = {};
     let routes_arr = {}; //linjojen asiakaslinjanumeroiden mukaan
-    let route_to_line={} // fyysinen linjanumero: asiakaslinja
+    let route_to_line = {} // fyysinen linjanumero: asiakaslinja
     let polylines = {};
     let lst_id = -1;
     const src_shapes = fs.readFileSync('rawdata/shapes.txt', 'utf-8');
@@ -68,10 +68,10 @@ function parseRoutes() {
         //console.log(line);
         line = line.replaceAll("\"", "");
         let [route_id, agency_id, route_short_name, route_long_name] = line.split(",");
-        
+
         let rid = parseInt(route_id);
         if (Number.isInteger(rid)) {
-            route_to_line[route_id]=route_short_name;
+            route_to_line[route_id] = route_short_name;
             if (!(route_short_name in routes_arr)) routes_arr[route_short_name] = [];
 
             routes_arr[route_short_name].push(route_id);
@@ -79,8 +79,8 @@ function parseRoutes() {
 
 
     });
-    let route_to_line_txt=JSON.stringify(route_to_line);
-    route_to_line_txt='var route_to_line = '+route_to_line_txt+";";
+    let route_to_line_txt = JSON.stringify(route_to_line);
+    route_to_line_txt = 'var route_to_line = ' + route_to_line_txt + ";";
     writeTextFile("www/js/route-to-line.js", route_to_line_txt);
     writeTextFile("tmp/routes.txt", JSON.stringify(routes_arr));
 
@@ -103,30 +103,35 @@ function parseRoutes() {
     let geotext = "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n";
     for (let linja in shapet_per_linja) {
 
-
-        if (tulostettavat.includes(linja)) {
-            geotext += '      {\n        "type": "Feature",\n        "properties": {\n          "id": "' + linja + '",\n          "name": "' + linja + '"\n        },\n        "geometry": {\n          "type": "MultiLineString",\n          "coordinates": [\n';
-            shapet_per_linja[linja].forEach(shap => {
-                geotext += '            [\n';
-                //console.log("l/s ",linja, shap);
-                //geotext+='[\n';
-                // geotext+='              [0,0],\n';
-                // geotext+='              [1,1],\n';
-                shape_arr[shap].forEach(koord => { //QQQ
-                    //console.log("koord", koord);
-                    geotext += '              [' + koord[1] + ', ' + koord[0] + '],\n'
-                }
-                ); //QQQ
-                // geotext+=']';
-                geotext = geotext.slice(0, -2);
-                geotext += '],\n'
-                //geotext += '\n            ],\n'
-            }
-
-            );
-            geotext = geotext.slice(0, -2);
-            geotext += '\n           ]}},\n';
+        let linjatyyppi="maaseutu";
+        if (kaupunkilinjat.includes(linja)) {
+            linjatyyppi = "kaupunki";
         }
+
+        console.log(linjatyyppi)
+        //geotext += '      {\n        "type": "Feature",\n        "properties": {\n          "id": "' + linja + '",\n          "name": "' + linja + '"\n        },\n        "geometry": {\n          "type": "MultiLineString",\n          "coordinates": [\n';
+        geotext += '      {\n        "type": "Feature",\n        "properties": {\n          "id": "' + linja + '",\n          "name": "' + linja + '",\n          "linjatyyppi": "' + linjatyyppi + '"\n        },\n        "geometry": {\n          "type": "MultiLineString",\n          "coordinates": [\n';
+        shapet_per_linja[linja].forEach(shap => {
+            geotext += '            [\n';
+            //console.log("l/s ",linja, shap);
+            //geotext+='[\n';
+            // geotext+='              [0,0],\n';
+            // geotext+='              [1,1],\n';
+            shape_arr[shap].forEach(koord => { //QQQ
+                //console.log("koord", koord);
+                geotext += '              [' + koord[1] + ', ' + koord[0] + '],\n'
+            }
+            ); //QQQ
+            // geotext+=']';
+            geotext = geotext.slice(0, -2);
+            geotext += '],\n'
+            //geotext += '\n            ],\n'
+        }
+
+        );
+        geotext = geotext.slice(0, -2);
+        geotext += '\n           ]}},\n';
+
     }
     geotext = geotext.slice(0, -2);
     geotext += "]}"

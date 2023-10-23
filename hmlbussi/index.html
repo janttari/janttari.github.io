@@ -42,6 +42,7 @@
 <body onload="alusta()">
     <div id="map" style="width: 15000px; height: 900px;"></div>
     <script>
+        nayta_maaseutu = true;
         class Sijainti { //kuvakkeita kartalle ja poistetaan vanhoja automaattisesti jos sijaintia ei päivitetty nn sekuntiin
             constructor(leafmap) {
                 var vahtiThis = this;
@@ -51,7 +52,7 @@
                 this.locationLayer.addTo(map); (this.leafmap);
                 this.interval = setInterval(function () {
                     for (let mk in vahtiThis.markkerit) {
-                        console.log(mk, vahtiThis.markkerit[mk].timestamp);
+                        //console.log(mk, vahtiThis.markkerit[mk].timestamp);
                         if (Date.now() - vahtiThis.markkerit[mk].timestamp > 60000) {//poista vanhat markkerit
                             console.log("DELETE", vahtiThis.markkerit[mk])
                             let iconitem = document.getElementsByClassName("marker_div_" + vahtiThis.markkerit[mk].id)[0];
@@ -121,54 +122,66 @@
             attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
-        var polylinePoints = [
-            [60.99596, 24.46434],
-            [60.92317224942032, 24.64754733389531],
-            [60.92340176, 24.64786014],
-            [60.92398573, 24.64660486],
-            [60.92463094, 24.64538178],
-            [60.92515883, 24.6446093]
-        ];
+        // var polylinePoints = [
+        //     [60.99596, 24.46434],
+        //     [60.92317224942032, 24.64754733389531],
+        //     [60.92340176, 24.64786014],
+        //     [60.92398573, 24.64660486],
+        //     [60.92463094, 24.64538178],
+        //     [60.92515883, 24.6446093]
+        // ];
 
         var geojsonLayer = new L.geoJson.ajax("./geojson/hml.geojson");
         geojsonLayer.addTo(map);
+        varita("0");
+
 
         function klikEnable() {
+            console.log("klikenable");
             geojsonLayer.eachLayer(function (layer) {
-                console.log(layer);
+               // console.log(layer);
                 layer.bindPopup(layer.feature.properties.id);
                 layer.on('click', function () {
-                    console.log(this.feature.properties.id);
+                   // console.log(this.feature.properties.id);
                 });
             });
         }
 
-        function varita() {
-            let varitettava = document.getElementById("linjaselect").value;
-            console.log(varitettava);
+        function varita(varitettavalinja) {
             geojsonLayer.eachLayer(layer => {
                 let randomColor = "#" + Math.floor(Math.random() * 16777215).toString(16);
-                if (layer.feature.properties.id == varitettava) {
+                if (layer.feature.properties.id == varitettavalinja) {
                     layer.bringToFront()
                     layer.setStyle({
-                        weight: 5,
+                        weight: 3,
                         color: '#ff0000',
                         dashArray: '',
                         opacity: 0.5
                     });
                 }
                 else {
+                    let paksuus = 1;
+                    if (layer.feature.properties.linjatyyppi == "kaupunki") {
+                        paksuus = 4;
+                    }
+                    else{
+                        if (!(nayta_maaseutu)) paksuus = 0;
+                    }
                     layer.bringToBack();
                     randomColor = "#3388ff";
                     layer.setStyle({
-                        weight: 2,
-                        color: randomColor,
+                        weight: paksuus,
+                        color: "#3388ff",
                         dashArray: '',
                         opacity: 0.5
                     });
                 }
             });
+        }
 
+        function varitaKlik() {
+            let varitettava = document.getElementById("linjaselect").value;
+            varita(varitettava);
         }
 
         function alusta() {
@@ -181,12 +194,17 @@
                 select.appendChild(opt);
             });
             klikEnable();
+            varita("0");
         }
 
 
         function klik(nr) { //--------------------------------
             s.setSijainti(nr, "5", 61.0000, 24.4414, 45);
+        }
 
+        function maaseutuOnOff(){
+            nayta_maaseutu=!nayta_maaseutu;
+            varita("0");
         }
 
         function siirra(nr) {
@@ -194,7 +212,7 @@
         }
 
         const s = new Sijainti(L);
-        console.log(mqtt);
+        //console.log(mqtt);
 
         const options = { // mqtt
             clean: true,
@@ -213,23 +231,23 @@
             const pbf = new Pbf(new Uint8Array(message));
             const obj = FeedMessage.read(pbf);
             obj.entity.forEach(ms => {
-                console.log(ms);
+                //console.log(ms);
                 let linjatxt = route_to_line[ms.vehicle.trip.route_id];
                 let suunta = ms.vehicle.position.bearing - 180;
                 s.setSijainti(ms.id, linjatxt, ms.vehicle.position.latitude, ms.vehicle.position.longitude, suunta);
             });
 
         });
-        console.log(route_to_line);
+        //console.log(route_to_line);
     </script>
 
     <br>
     <select name="linjat" id="linjaselect">
     </select>
-    <button onclick="varita()">varita</button>
-    <button onclick="klik('1')">1</button>
-    <button onclick="klik('2')">2</button>
-    <button onclick="siirra('1')">s1</button>
+    <button onclick="varitaKlik()">varita</button>
+    <button onclick="maaseutuOnOff()">maaseutu</button>
+    <!-- <button onclick="klik('2')">2</button>
+    <button onclick="siirra('1')">s1</button> -->
 </body>
 
 </html>
