@@ -1,0 +1,62 @@
+ 
+reitit yms: https://tvv.fra1.digitaloceanspaces.com/203.zip
+^päivittyy joka yö https://opendata.waltti.fi/docs#supportedCities
+
+--
+
+api tunnus
+https://opendata.waltti.fi/getting-started
+8152164569640084:0vg4T5oMyp4mxHNvEXqb8wCJpN744BuF --> https://www.base64encode.org/
+ODE1MjE2NDU2OTY0MDA4NDowdmc0VDVvTXlwNG14SE52RVhxYjh3Q0pwTjc0NEJ1Rg==
+
+routes.txt <> shapes.txt <> trips.txt
+
+
+ESIM:
+routes.txt:
+"9041","7345","4","4 Kettumäki-Tarvasmäki","","3","","","","0","1"
+"9042","7345","4","4 Rautaruukintie-Tarvasmäki-Kettumäki","","3","","","","0","1"
+"9043","7345","4","4 vara Rautaruukintie-Tarvasmäki-ras-Poltinaho","","3","","FA9866","","0","1"
+**9041 **4
+
+trips.txt:
+9041 viittaa shapeihin 401, 402, 403, 404, 405, 406, 407
+
+shapes.txt:stä lista
+{401: [points], 402: [points], 403: [points]}
+
+
+trips kertoo shapen numeron
+
+
+---------------- https://portal-api.digitransit.fi/profile
+User profile
+Account details
+Email
+janttari@gmail.com
+First name
+Jani
+Last name
+Janttari
+Registration date
+10/16/2023
+Change name Change password Close account
+Subscriptions
+Subscription details
+Product
+State
+Action
+Name
+digitransit-developer-api
+Rename
+Started on
+10/16/2023
+Primary key
+4269696152fe438ebbb4ea8789c4bee2
+Hide | Regenerate
+Secondary key
+377b0817d61f4488ae8bbb35f8fe9952
+Hide | Regenerate
+Digitransit developer API
+Active
+Cancel
