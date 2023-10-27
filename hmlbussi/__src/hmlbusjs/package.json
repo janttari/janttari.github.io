@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "csv-string": "^4.1.1",
-    "decompress": "^4.2.1",
-    "node-schedule": "^2.1.1"
-  }
-}
