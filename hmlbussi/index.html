@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="./js/route-to-line.js"></script> <!-- route_to_line -->
+    <script src="./js/bus_routes.js"></script> <!-- bus_routes leflet layer -->
+    <script src="./js/bus_stops.js"></script> <!-- bus_stops leflet layer -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-ajax/2.1.0/leaflet.ajax.js"></script>
@@ -42,7 +44,10 @@
 <body onload="alusta()">
     <div id="map" style="width: 15000px; height: 900px;"></div>
     <script>
-        nayta_maaseutu = true;
+        var nayta_maaseutu = true;
+        var nayta_pysakit = false;
+        var pysakitlayer = null;
+
         class Sijainti { //kuvakkeita kartalle ja poistetaan vanhoja automaattisesti jos sijaintia ei päivitetty nn sekuntiin
             constructor(leafmap) {
                 var vahtiThis = this;
@@ -82,7 +87,7 @@
                     })
                     this.markkerit[id].marker = L.marker([53, 10], { //ikonimarkkeri
                         icon: divIcon,
-                        id: 2
+                        id: 2        //console.log(mqtt);
                     });
 
                     this.markkerit[id].textMarker = L.marker([53, 10], { //tekstimarkkeri
@@ -122,10 +127,8 @@
             attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
 
-
-        var geojsonLayer = new L.geoJson.ajax("./geojson/hml.geojson");
-        geojsonLayer.addTo(map);
-
+        var geojsonLayer = L.geoJSON().addTo(map);
+        geojsonLayer.addData(bus_routes);
 
         function klikEnable() {
             console.log("klikenable");
@@ -136,6 +139,29 @@
                     // console.log(this.feature.properties.id);
                 });
             });
+        }
+
+        function showStops() {
+            nayta_pysakit = !nayta_pysakit;
+            console.log("showstops", nayta_pysakit);
+            if (nayta_pysakit) {
+                //PYSÄKIT
+                var geojsonMarkerOptions = {
+                    radius: 2,
+                    fillColor: "#0000ff",
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                };
+                pysakitlayer = L.geoJSON(bus_stops, {
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, geojsonMarkerOptions);
+                    }
+                })
+                pysakitlayer.addTo(map); // /PYSÄKIT
+            }
+            else map.removeLayer(pysakitlayer);
         }
 
         function varita(varitettavalinja) {
@@ -188,9 +214,10 @@
             setTimeout(
                 function () {
                     klikEnable();
-            varita("0");
+                    varita("0");
+                    showStops();
                 }, 1000);
-      
+
         }
 
 
@@ -208,7 +235,6 @@
         }
 
         const s = new Sijainti(L);
-        //console.log(mqtt);
 
         const options = { // mqtt
             clean: true,
@@ -227,32 +253,29 @@
         );
         client.on('disconnect', function () {
             console.log('disConnected')
-            //client.subscribe("/gtfsrt/vp/Hameenlinna/#")
         }
         );
 
         client.on('message', function (topic, message) {
-            // console.log("msg");
             const pbf = new Pbf(new Uint8Array(message));
             const obj = FeedMessage.read(pbf);
             obj.entity.forEach(ms => {
-                //console.log(ms);
                 let linjatxt = route_to_line[ms.vehicle.trip.route_id];
                 let suunta = ms.vehicle.position.bearing - 180;
                 s.setSijainti(ms.id, linjatxt, ms.vehicle.position.latitude, ms.vehicle.position.longitude, suunta);
             });
 
         });
-        //console.log(route_to_line);
+
     </script>
 
     <br>
     <select name="linjat" id="linjaselect">
     </select>
-    <button onclick="varitaKlik()">varita</button>
+    <button onclick="varitaKlik()">väritä</button>
     <button onclick="maaseutuOnOff()">maaseutu</button>
-    <!-- <button onclick="klik('2')">2</button>
-    <button onclick="siirra('1')">s1</button> -->
+    <button onclick="showStops()">pysäkit</button>
+
 </body>
 
 </html>
