@@ -1,2 +1,0 @@
-"feed_publisher_name","feed_publisher_url","feed_lang","feed_start_date","feed_end_date","feed_version"
-"Hämeenlinna","http://waltti.fi","fi","20230605","20240602","202310191439"
