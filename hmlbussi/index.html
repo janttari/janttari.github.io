@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fi">
+
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quick Start - Leaflet</title>
+    <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="./js/route-to-line.js"></script> <!-- route_to_line -->
+    <script src="./js/bus_routes.js"></script> <!-- bus_routes leflet layer -->
+    <script src="./js/bus_stops.js"></script> <!-- bus_stops leflet layer -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-ajax/2.1.0/leaflet.ajax.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://unpkg.com/pbf@3.0.5/dist/pbf.js"></script>
+    <script src="./js/pbf.js"></script>
+    <script src="./js/gtfs-realtime.browser.proto.js"></script>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        .leaflet-control-container {
+            position: absolute;
+            right: 56px;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+            position: relative;
+            float: left;
+        }
+
+        #valikkonappi {
+            top: 0px;
+            z-index: 4;
+            width: 48px;
+            height: 48px;
+            left: 0;
+            background-color: red;
+            position: absolute;
+            float: left;
+        }
+
+        #valikko {
+            top: 0px;
+            z-index: 3;
+            width: 300px;
+            height: 400px;
+            left: 0;
+            background-color: gray;
+            position: absolute;
+            float: left;
+            display: none;
+        }
+
+        #resetsijainti {
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body onload="alusta()">
+    <div id="map"></div>
+    <div id="valikkonappi"><button onclick="menutoggle()">
+            <svg width="48px" height="48px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M4 7a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm0 5a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm0 5a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1z"
+                    fill="#0D0D0D" />
+            </svg>
+        </button><br>
+    </div>
+    <div id="valikko">
+
+        <br><br><br><br>
+        <font size="24" color="white">
+            <input type="checkbox" id="chkmaaseutu" name="chkmaaseutu" value="chkmaaseutu" onclick="chkboxtoggle()">
+            <label for="chkmaaseutu"> Maaseutu</label><br>
+            <input type="checkbox" id="chkpysakit" name="chkpysakit" value="chkpysakit" onclick="chkboxtoggle()">
+            <label for="chkpysakit"> Pysäkit</label><br>
+            <br>
+            <div id="resetsijainti" onclick="resetsijainti()">Resetoi</div>
+        </font>
+    </div>
+    <script>
+        var showmenu = false;
+        var kaupunkiLinjat = ["1", "1S", "2", "2U", "3", "3S", "3K", "4", "5", "10", "10T", "11", "13", "14", "14K", "16", "17", "17K"];
+        var pysakitlayer = null;
+
+        class Sijainti { //kuvakkeita kartalle ja poistetaan vanhoja automaattisesti jos sijaintia ei päivitetty nn sekuntiin
+            constructor(leafmap) {
+                var vahtiThis = this; //leaflet vs s
+                this.leafmap = leafmap;
+                this.markkerit = {};
+                this.locationLayer = new this.leafmap.FeatureGroup();
+                this.locationLayer.addTo(map).on('click', this.#onClick); //(this.leafmap);
+                this.interval = setInterval(function () {
+                    for (let mk in vahtiThis.markkerit) {
+                        if (Date.now() - vahtiThis.markkerit[mk].timestamp > 60000) {//poista vanhat markkerit
+                            let poistettava = "marker-" + mk;
+                            let markerItem = document.getElementsByClassName(poistettava)[0];
+                            markerItem.remove();
+                            delete vahtiThis.markkerit[mk];
+                        }
+                    }
+                }, 5000);
+            }
+
+            #onClick(e) { //markkeria klikattu
+                let linjaid = e.sourceTarget.options.icon.options.className.split("-")[1];
+                let linjatxt = e.sourceTarget.options.icon.options.linjaNimi;
+                varita(linjatxt);
+            }
+
+            #createMarker(id, name) { //luodaan uusi markkeri 
+                let markkerisvgico = `<svg version="1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+        <g id="%GID%">
+        <path fill="#f76013"   
+        d="M6 25 L 25 0 L 44 25 Z"/>
+        <circle fill="orange" cx="25" cy="25" r="19" />
+        <circle fill="white" cx="25" cy="25" r="17" />
+        </g>
+        <text id="%TEXTID%" x="25" y="26" font-family="sans-serif" font-size="16px" font-weight="bold" fill="#f76013" text-anchor="middle" alignment-baseline="central">%NAME%</text>
+        </svg>`.replace("%GID%", "gid_" + id).replace("%TEXTID%", "textid_" + id).replace("%NAME%", name);
+                this.markkerit[id] = {};
+                this.markkerit[id].markkeri = L.marker([0, 0], { //tekstimarkkeri
+                    icon: L.divIcon({
+                        iconSize: [40, 40],
+                        html: markkerisvgico,
+                        iconAnchor: [20, 20],
+                        className: 'marker-' + id,
+                        linjaNimi: name
+                    })
+                });
+                this.locationLayer.addLayer(this.markkerit[id].markkeri);
+            }
+
+            setSijainti(id, name, lat, lon, suunta) { //muutetaan markkerin sijaintia ja suuntaa kartalla
+                if ((kaupunkiLinjat.includes(name)) || (document.getElementById("chkmaaseutu").checked)) { //!TODO nyt ei poista markkereita ennen kuin ne siivotaan nn sekunnin päästä
+                    if (!(this.markkerit.hasOwnProperty(id))) { //markkeria ei vielä ole
+                        this.#createMarker(id, name) //luodaan markkeri
+                    }
+                    //päivitetään markkerin sijaintia kartalla
+                    var newLatLng = new L.LatLng(lat, lon);
+                    this.markkerit[id].markkeri.setLatLng(newLatLng);
+                    var svgi = document.getElementById("gid_" + id);
+                    //suunta = suunta - 180;
+                    svgi.setAttribute("transform", "rotate(" + suunta + " 25 25)")
+                    //svgi.setAttribute('transform', 'rotate(' + suunta + ' 25 25)');
+                    this.markkerit[id].timestamp = Date.now();
+                }
+            }
+
+            maaseutuPysakitMuuttuu() {
+                console.log("päivitetään näkymää");
+                if (!(document.getElementById("chkmaaseutu").checked)) {
+                    for (let mk in this.markkerit) { 
+                        if (!(this.markkerit[mk].markkeri.options.icon.options.linjaNimi in kaupunkiLinjat)) {
+                            let poistettava = "marker-" + mk;
+                            let markerItem = document.getElementsByClassName(poistettava)[0];
+                            markerItem.remove();
+                            delete this.markkerit[mk];
+                        }
+                    }
+                }
+            }
+        } //------------------------------------------------------------------------------------------------------------------------------------
+
+        const map = L.map('map').setView([60.99596, 24.46434], 12);
+        const tiles = L.tileLayer('https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+        map.on('zoomend moveend', function (e) { //zoomaus tai kartan siirto valmis
+            paivitahash();
+        })
+
+        var geojsonLayer = L.geoJSON().addTo(map);
+        geojsonLayer.addData(bus_routes);
+
+        // function klikEnable() {
+        //     console.log("klikenable");
+        //     geojsonLayer.eachLayer(function (layer) {
+        //         //console.log(layer);
+        //         layer.bindPopup(layer.feature.properties.id);
+        //         layer.on('click', function () {
+        //             console.log(this.feature.properties.id);
+        //         });
+        //     });
+        // }
+
+
+        function varita(varitettavalinja) {
+            console.log("VÄRITÄ", varitettavalinja);
+            //console.log("varita", varitettavalinja, typeof (varitettavalinja));
+            geojsonLayer.eachLayer(layer => {
+                //let randomColor = "#" + Math.floor(Math.random() * 16777215).toString(16);
+                if (layer.feature.properties.id == varitettavalinja) {
+                    layer.bringToFront()
+                    layer.setStyle({
+                        weight: 3,
+                        color: '#ff0000',
+                        dashArray: '',
+                        opacity: 0.5
+                    });
+                }
+                else {
+                    let paksuus = 1;
+                    if (layer.feature.properties.linjatyyppi == "kaupunki") {
+                        paksuus = 4;
+                    }
+                    else {
+                        if (!(document.getElementById("chkmaaseutu").checked)) {
+                            paksuus = 0;
+                        }
+                    }
+                    layer.bringToBack();
+                    randomColor = "#3388ff";
+                    layer.setStyle({
+                        weight: paksuus,
+                        color: "#3388ff",
+                        dashArray: '',
+                        opacity: 0.5
+                    });
+                }
+            });
+        }
+        function paivitahash() {
+            let smaaseutu = String(document.getElementById("chkmaaseutu").checked);
+            let spysakit = String(document.getElementById("chkpysakit").checked);
+            let szoom = String(map.getZoom());
+            let slat = String(map.getCenter().lat);
+            let slon = String(map.getCenter().lng);
+            window.location.hash = "maaseutu=" + smaaseutu + "&pysakit=" + spysakit + "&zoom=" + szoom + "&lat=" + slat + "&lon=" + slon;
+        }
+
+        function chkboxtoggle() { //checkboxien arvo ja leafletin zoom ja sijainti urliin
+            paivitahash();
+            if (document.getElementById("chkpysakit").checked) {
+                //PYSÄKIT
+                //console.log("showpsa");
+                var geojsonMarkerOptions = {
+                    radius: 2,
+                    fillColor: "#0000ff",
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                };
+                pysakitlayer = L.geoJSON(bus_stops, {
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, geojsonMarkerOptions);
+                    }
+                })
+                pysakitlayer.addTo(map); // /PYSÄKIT
+            }
+            else {
+                if (pysakitlayer) map.removeLayer(pysakitlayer);
+            }
+            varita("0");
+            s.maaseutuPysakitMuuttuu();
+        }
+
+        function menutoggle() {
+            showmenu = !showmenu;
+            if (showmenu) {
+                document.getElementById("valikko").style.display = "inherit";
+            }
+            else {
+                document.getElementById("valikko").style.display = "none";
+            }
+        }
+
+
+        function varitaKlik() {
+            let varitettava = document.getElementById("linjaselect").value;
+            varita(varitettava);
+        }
+
+        function resetsijainti() {
+            document.getElementById("chkmaaseutu").checked = false;
+            document.getElementById("chkpysakit").checked = false;
+            map.setView(new L.LatLng(60.99596, 24.46434), 12);
+        }
+
+        function alusta() {
+            setTimeout(
+                function () {
+                    if (window.location.hash.substring(1)) {
+                        const urlParams = new URLSearchParams(window.location.hash.substr(1))
+                        let zoom = parseFloat(urlParams.get('zoom'))
+                        let lon = parseFloat(urlParams.get('lon'))
+                        let lat = parseFloat(urlParams.get('lat'))
+                        let bmaaseutu = (urlParams.get('maaseutu') === "true");
+                        let bmapysakit = (urlParams.get('pysakit') === "true");
+                        document.getElementById("chkmaaseutu").checked = bmaaseutu;
+                        document.getElementById("chkpysakit").checked = bmapysakit;
+                        map.setView(new L.LatLng(lat, lon), zoom);
+                        chkboxtoggle();
+                    }
+                }, 1000);
+
+        }
+
+        const s = new Sijainti(L); //Sijainti-luokka hoitaa kartan kuvakkeet
+
+        const options = { // mqtt
+            clean: true,
+            connectTimeout: 4000,
+            clientId: 'jiitest',
+            username: 'user',
+            password: 'userpass',
+        }
+        const client = mqtt.connect("wss://mqtt.digitransit.fi", options);
+        client.on('connect', function () {
+            console.log('Connected')
+            client.subscribe("/gtfsrt/vp/Hameenlinna/#")
+        }
+
+
+        );
+        client.on('disconnect', function () {
+            console.log('disConnected')
+        }
+        );
+
+        client.on('message', function (topic, message) {
+            const pbf = new Pbf(new Uint8Array(message));
+            const obj = FeedMessage.read(pbf);
+            obj.entity.forEach(ms => {
+                let linjatxt = route_to_line[ms.vehicle.trip.route_id];
+                let suunta = ms.vehicle.position.bearing;
+                //console.log(linjatxt, "-->", ms.id)
+                s.setSijainti(ms.id, linjatxt, ms.vehicle.position.latitude, ms.vehicle.position.longitude, suunta);
+            });
+
+        });
+
+    </script>
+    <br>
+
+</body>
+
+</html>
