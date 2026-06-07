@@ -415,7 +415,6 @@
         line.routeShort = routeShort;
         line.on("click", () => {
           highlightRoute(routeShort);
-          console.log("hlroute");
           document.getElementById("routeSelect").value =
             routeShort;
         });
@@ -476,7 +475,7 @@
     }
 
     function highlightRoute(route) {
-      console.log(route);
+      //console.log(route);
       clearHighlight();
       selectedRoute = route;
       if (!routeLayers[route])
@@ -623,7 +622,7 @@
           let id = ms.id || ms.vehicle.vehicle?.id;
           const label = ms.vehicle.vehicle.label;
           const speed = ms.vehicle.position.speed;
-          if (topic.includes("Lahti")) console.log(ms);
+          //if (topic.includes("Lahti")) console.log(ms);
           const lat = ms.vehicle.position.latitude;
           const lon = ms.vehicle.position.longitude;
           const routeId = ms.vehicle.trip?.route_id;
