@@ -1,0 +1,77 @@
+
+.btn span.glyphicon{    			
+    opacity: 0;				
+}
+
+
+.btn.active span.glyphicon{				
+    opacity: 1;				
+}
+
+.vihr{
+    background-color: #00FF00;
+    width: 100px;
+    display: inline-block;
+} 
+
+.red{
+    background-color: #ea8080;
+    width: 100px;
+    display: inline-block;
+} 
+
+.green{
+    background-color: #96ea96;
+    width: 100px;
+    display: inline-block;
+} 
+
+.yellow{
+    background-color: #fcfc93;
+    width: 100px;
+    display: inline-block;
+} 
+
+.blue{
+    background-color: #92b7fe;
+    width: 100px;
+    display: inline-block;
+} 
+
+.gray{
+    background-color: gray;
+    width: 100px;
+    display: inline-block;
+} 
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+#map {
+    width: 600px;
+    height: 1150px;
+} 
+
+#kuntalista {
+    overflow:auto; width:200px;height:500px;
+} 
+
+.split {
+    height: 100%;
+    width: 50%;
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    overflow-x: hidden;
+    padding-top: 20px;
+}
+
+.left {
+    left: 0;
+}
+
+.right {
+    right: 0;
+}

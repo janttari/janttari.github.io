@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Bussikartta</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://unpkg.com/pbf@3.0.5/dist/pbf.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./js/gtfs-realtime.browser.proto.js"></script>
+  <style>
+    body {
+      margin: 0;
+    }
+
+    #map {
+      height: 100vh;
+    }
+
+
+
+    /* FADE SUPPORT */
+    .leaflet-marker-icon {
+      transition: opacity 1s linear;
+    }
+
+    .bus-wrap {
+      position: relative;
+      width: 34px;
+      height: 34px;
+    }
+
+    .bus-arrow {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      transform-origin: center;
+    }
+
+    .bus-label,
+    .train-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+      padding: 1px 5px;
+      border-radius: 10px;
+      pointer-events: none;
+    }
+
+    .bus-label {
+      background: orange;
+    }
+
+    .train-label {
+      background: red;
+    }
+
+
+
+    #routeSelect {
+      width: 120px;
+    }
+
+
+    #topUI {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="topUI">
+    <div id="status">Loading GTFS...</div>
+    <div id="cityPanel">
+      <select id="citySelect"></select>
+    </div>
+    <div id="routePanel">
+      <select id="routeSelect">
+        <option value="">Kaikki linjat</option>
+      </select>
+    </div>
+  </div>
+  <div id="map"></div>
+
+  <script>
+    //****************************** Kaupungit *******************
+
+    const CITIES = {
+      hameenlinna: {
+        name: "Hämeenlinna",
+        topic: "Hameenlinna",
+        zipFile: "203.zip",
+        center: [61.05662, 24.43668],
+        zoom: 11
+      },
+      joensuu: {
+        name: "Joensuu",
+        topic: "Joensuu",
+        zipFile: "207.zip",
+        center: [62.60118, 29.76316],
+        zoom: 11
+      },
+      jyvaskyla: {
+        name: "Jyväskylä",
+        topic: "LINKKI",
+        zipFile: "209.zip",
+        center: [62.2426, 25.7473],
+        zoom: 11
+      },
+      kajaani: {
+        name: "Kajaani",
+        topic: "Kajaani",
+        zipFile: "211.zip",
+        center: [64.2221, 27.7278],
+        zoom: 11
+      },
+      kotka: {
+        name: "Kotka",
+        topic: "Kotka",
+        zipFile: "217.zip",
+        center: [60.4661, 26.9458],
+        zoom: 12
+      },
+      kouvola: {
+        name: "Kouvola",
+        topic: "Kouvola",
+        zipFile: "219.zip",
+        center: [60.8681, 26.7042],
+        zoom: 11
+      },
+      kuopio: {
+        name: "Kuopio",
+        topic: "Kuopio",
+        zipFile: "221.zip",
+        center: [62.8924, 27.6770],
+        zoom: 11
+      },
+      lahti: {
+        name: "Lahti",
+        topic: "Lahti",
+        zipFile: "223.zip",
+        center: [60.98028, 25.6550],
+        zoom: 12
+      },
+      lappeenranta: {
+        name: "Lappeenranta",
+        topic: "Lappeenranta",
+        zipFile: "225.zip",
+        center: [61.0587, 28.1887],
+        zoom: 11
+      },
+      mikkeli: {
+        name: "Mikkeli",
+        topic: "Mikkeli",
+        zipFile: "227.zip",
+        center: [61.6886, 27.2723],
+        zoom: 11
+      },
+      oulu: {
+        name: "Oulu",
+        topic: "OULU",
+        zipFile: "229.zip",
+        center: [65.0121, 25.4651],
+        zoom: 11
+      },
+      pori: {
+        name: "Pori",
+        topic: "Pori",
+        zipFile: "231.zip",
+        center: [61.4851, 21.7976],
+        zoom: 11
+      },
+      raasepori: {
+        name: "Raasepori",
+        topic: "Raasepori",
+        zipFile: "232.zip",
+        center: [59.9736, 23.4333],
+        zoom: 10
+      },
+      rovaniemi: {
+        name: "Rovaniemi",
+        topic: "Rovaniemi",
+        zipFile: "237.zip",
+        center: [66.5039, 25.7294],
+        zoom: 11
+      },
+      salo: {
+        name: "Salo",
+        topic: "Salo",
+        zipFile: "239.zip",
+        center: [60.3833, 23.1333],
+        zoom: 11
+      },
+      vaasa: {
+        name: "Vaasa",
+        topic: "Vaasa",
+        zipFile: "249.zip",
+        center: [63.0951, 21.6165],
+        zoom: 11
+      }
+    };
+    let CITY_KEY = "lahti";
+    let CITY = CITIES[CITY_KEY];
+    //*************************************************************************
+
+    //zipit palvelimelle: https://opendata.waltti.fi/docs
+    let mqttReady = false;
+    let currentTopic = null;
+    let hashTimeout;
+
+    function updateMqttSubscription() {
+      if (!mqttReady) return;
+      const newTopic = "/gtfsrt/vp/" + CITY.topic + "/#";
+
+      // unsubscribe vanha
+      if (currentTopic) {
+        client.unsubscribe(currentTopic);
+      }
+
+      // subscribe uusi
+      client.subscribe(newTopic);
+
+      currentTopic = newTopic;
+
+      console.log("MQTT subscribed to:", newTopic);
+    }
+    function resetLiveState() {
+
+      buses = {};
+      busLayer.clearLayers();
+    }
+    function setCity(cityKey) {
+
+      CITY_KEY = cityKey;
+      CITY = CITIES[cityKey];
+      document.getElementById("routeSelect").value = "";
+      // reset map
+      map.setView(CITY.center, CITY.zoom);
+      resetLiveState();
+      //busLayer.clearLayers();
+      routeLayerGroup.clearLayers();
+      //buses = {};
+      routeLayers = {};
+      selectedRoute = null;
+      loadGTFS();
+      updateMqttSubscription();
+    }
+
+    function initCitySelector() {
+
+      const sel = document.getElementById("citySelect");
+
+      for (const key in CITIES) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = CITIES[key].name;
+        sel.appendChild(opt);
+      }
+
+      sel.value = CITY_KEY;
+
+      sel.addEventListener("change", e => {
+        setCity(e.target.value);
+        updateHash();
+      });
+    }
+
+    function applyHash() {
+
+      const hash = window.location.hash;
+      if (!hash) return;
+
+      const p = new URLSearchParams(hash.replace("#", ""));
+
+      const city = p.get("city");
+      const lat = parseFloat(p.get("lat"));
+      const lon = parseFloat(p.get("lon"));
+      const zoom = parseInt(p.get("zoom"));
+
+      if (city && CITIES[city]) {
+        CITY_KEY = city;
+        CITY = CITIES[city];
+
+        document.getElementById("citySelect").value = city;
+      }
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        map.setView([lat, lon], zoom || CITY.zoom);
+      } else {
+        map.setView(CITY.center, CITY.zoom);
+      }
+    }
+
+
+    function isLetter(char) {
+      return /^[A-Za-z]$/.test(char);
+    }
+    // ---------------------------
+    // 🗺️ MAP
+    // ---------------------------
+    const map = L.map('map', {
+      zoomControl: false
+    }).setView(CITY.center, CITY.zoom);
+    L.control.zoom({
+      position: 'topright'
+    }).addTo(map);
+    let busLayer = L.layerGroup().addTo(map);
+    let routeLayerGroup = L.layerGroup().addTo(map);
+    map.on("moveend", () => {
+
+      clearTimeout(hashTimeout);
+
+      hashTimeout = setTimeout(() => {
+        updateHash();
+      }, 150); // 100–300ms hyvä range
+    });
+    //applyHash();
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // ---------------------------
+    // 📦 DATA
+    // ---------------------------
+    let GTFS = {};
+    let buses = {};
+    // { id: { marker, lastSeen } }
+    let routeLayers = {};
+    let selectedRoute = null;
+
+    // ---------------------------
+    // 📥 GTFS LOAD
+    // ---------------------------
+    async function loadGTFS() {
+      const res = await fetch(CITY.zipFile);
+      const buffer = await res.arrayBuffer();
+      const zip = await JSZip.loadAsync(buffer);
+      GTFS.routes = Papa.parse(
+        await zip.file("routes.txt").async("string"),
+        { header: true, skipEmptyLines: true }
+      ).data;
+      GTFS.routeMap = {};
+      for (const r of GTFS.routes) {
+        GTFS.routeMap[r.route_id] = r.route_short_name || r.route_id;
+      }
+      GTFS.shapes = Papa.parse(
+        await zip.file("shapes.txt").async("string"),
+        { header: true, skipEmptyLines: true }
+      ).data;
+      GTFS.trips = Papa.parse(
+        await zip.file("trips.txt").async("string"),
+        { header: true, skipEmptyLines: true }
+      ).data;
+      drawAllRoutes();
+      document.getElementById("status").innerText = "GTFS loaded";
+    }
+
+    // ---------------------------
+    // 🗺️ ROUTES
+    // ---------------------------
+    function drawAllRoutes() {
+      const shapeToRoute = {};
+      const routesSeen = new Set();
+      for (const trip of GTFS.trips) {
+        const routeId = trip.route_id;
+        const shapeId = trip.shape_id;
+        const shortName =
+          GTFS.routeMap[routeId] || routeId;
+        if (!shapeToRoute[shapeId]) {
+          shapeToRoute[shapeId] = shortName;
+        }
+        routesSeen.add(shortName);
+      }
+      const grouped = {};
+      for (const p of GTFS.shapes) {
+        if (!p.shape_id) continue;
+        if (!grouped[p.shape_id])
+          grouped[p.shape_id] = [];
+        grouped[p.shape_id].push(p);
+      }
+      routeLayers = {};
+      for (const shapeId in grouped) {
+        const routeShort = shapeToRoute[shapeId];
+        if (!routeShort)
+          continue;
+        const coords = grouped[shapeId]
+          .sort((a, b) =>
+            Number(a.shape_pt_sequence) -
+            Number(b.shape_pt_sequence))
+          .map(p => [
+            Number(p.shape_pt_lat),
+            Number(p.shape_pt_lon)
+          ]);
+        if (coords.length < 2)
+          continue;
+        const line = L.polyline(coords, {
+          color: "#777",
+          weight: 2,
+          opacity: 0.4
+        }).addTo(routeLayerGroup);
+        line.routeShort = routeShort;
+        line.on("click", () => {
+          highlightRoute(routeShort);
+          console.log("hlroute");
+          document.getElementById("routeSelect").value =
+            routeShort;
+        });
+        if (!routeLayers[routeShort])
+          routeLayers[routeShort] = [];
+
+        routeLayers[routeShort].push(line);
+      }
+      fillRouteSelector();
+    }
+
+    function fillRouteSelector() {
+      const select = document.getElementById("routeSelect");
+
+      // 🔥 tärkeä: estää vanhat eventit ja tyhjentää UI:n oikein
+      select.onchange = null;
+      select.innerHTML = '<option value="">Kaikki linjat</option>';
+
+      const routes = Object.keys(routeLayers)
+        .sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true })
+        );
+
+      for (const route of routes) {
+        const opt = document.createElement("option");
+        opt.value = route;
+        opt.textContent = route;
+        select.appendChild(opt);
+      }
+
+      // 🔥 tärkeä: uusi event handler aina puhtaasti
+      select.onchange = (e) => {
+        const value = e.target.value;
+
+        if (!value) {
+          clearHighlight();
+        } else {
+          highlightRoute(value);
+        }
+      };
+
+      // 🔥 resetoi valinta turvallisesti
+      select.value = "";
+    }
+
+    function clearHighlight() {
+      selectedRoute = null;
+      for (const route in routeLayers) {
+        routeLayers[route].forEach(line => {
+          line.setStyle({
+            color: "#777",
+            weight: 2,
+            opacity: 0.4
+          });
+          line.bringToBack();
+        });
+      }
+    }
+
+    function highlightRoute(route) {
+      console.log(route);
+      clearHighlight();
+      selectedRoute = route;
+      if (!routeLayers[route])
+        return;
+      routeLayers[route].forEach(line => {
+        line.setStyle({
+          color: "red",
+          weight: 6,
+          opacity: 1
+        });
+        line.bringToFront();
+      });
+    }
+
+    // ---------------------------
+    // 🚌 UPDATE BUS (FADE ENABLED)
+    // ---------------------------
+    function updateBus(id, lat, lon, route, isTrain = false, angle = 0, label = "", speed=0) {
+      if (!lat || !lon) return;
+      const now = Date.now();
+      let icon;
+      if (isTrain) {
+        icon = L.divIcon({
+          className: "",
+          html: `
+        <div class="bus-wrap">
+          <div class="bus-arrow" style="transform: rotate(${angle}deg);">
+            <svg viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="red" stroke="#FFF" stroke-width="6"/>
+              <text x="50" y="55" text-anchor="middle" font-size="30" fill="white">🚆</text>
+            </svg>
+          </div>
+          <div class="train-label">${route}</div>
+        </div>
+      `,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+
+      } else {
+        icon = L.divIcon({
+          className: "",
+          html: `
+        <div class="bus-wrap">
+          <div class="bus-arrow" style="transform: rotate(${angle}deg);">
+            <svg viewBox="0 0 149 178">
+              <path fill="orange" stroke="#FFF" stroke-width="6"
+                d="M126 23l-6-6A69 69 0 0 0 74 1a69 69 0 0 0-51 22A70 70 0 0 0 1 74c0 21 7 38 22 52l43 47c6 6 11 6 16 0l48-51c12-13 18-29 18-48 0-20-8-37-22-51z"/>
+            </svg>
+          </div>
+          <div class="bus-label">${route}</div>
+        </div>
+      `,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+      }
+      if (!buses[id]) {
+        const marker = L.marker([lat, lon], { icon }).addTo(busLayer);
+        marker.routeShort = route;
+        marker.on("click", () => {
+          highlightRoute(marker.routeShort);
+          //if (marker.routeShort) highlightRoute(marker.routeShort);
+        });
+        buses[id] = {
+          marker,
+          lastSeen: now
+        };
+      } else {
+        const bus = buses[id];
+        bus.marker.setLatLng([lat, lon]);
+        bus.marker.setIcon(icon);
+        bus.marker.bindPopup(
+          `🚌 ${id}<br>
+          Route: ${route}<br>
+          Label: ${label}<br>
+          Speed: ${speed != null ? Math.round(speed * 3.6) + " km/h" : "?"}`
+        );
+        bus.lastSeen = now;
+        const el = bus.marker.getElement();
+        if (el) el.style.opacity = 1;
+      }
+    }
+
+    // ---------------------------
+    // 🧹 FADE + REMOVE LOOP
+    // ---------------------------
+    setInterval(() => {
+      const now = Date.now();
+      const fadeStart = 30 * 1000;
+      const removeAfter = 60 * 1000;
+      for (const id in buses) {
+        const bus = buses[id];
+        const age = now - bus.lastSeen;
+        const el = bus.marker.getElement();
+        if (!el) continue;
+        // fade
+        if (age > fadeStart && age <= removeAfter) {
+          const t = (age - fadeStart) / (removeAfter - fadeStart);
+          el.style.opacity = 1 - t;
+        }
+        // remove
+        if (age > removeAfter) {
+          map.removeLayer(bus.marker);
+          delete buses[id];
+        }
+      }
+    }, 2000);
+
+    function updateHash() {
+      const c = map.getCenter();
+      const z = map.getZoom();
+      const hash =
+        `#city=${CITY_KEY}&lat=${c.lat.toFixed(5)}&lon=${c.lng.toFixed(5)}&zoom=${z}`;
+      history.replaceState(null, "", hash);
+    }
+
+    // ---------------------------
+    // 📡 MQTT
+    // ---------------------------
+    const client = mqtt.connect("wss://mqtt.digitransit.fi", {
+      clean: true,
+      connectTimeout: 4000,
+      clientId: 'gtfs_' + Math.random().toString(16).slice(2),
+      username: 'user',
+      password: 'userpass'
+    });
+
+    client.on("connect", () => {
+      document.getElementById("status").innerText = "MQTT connected";
+      client.subscribe("/gtfsrt/vp/digitraffic/#"); //junat
+      mqttReady = true;
+      updateMqttSubscription();
+    });
+
+    client.on("message", (topic, message) => {
+      try {
+        //console.log(topic);
+        //if (!topic.includes(CITY.topic)) return;
+        const pbf = new Pbf(new Uint8Array(message));
+        const obj = FeedMessage.read(pbf);
+        obj.entity.forEach(ms => {
+          if (!ms.vehicle || !ms.vehicle.position) return;
+          let id = ms.id || ms.vehicle.vehicle?.id;
+          const label = ms.vehicle.vehicle.label;
+          const speed = ms.vehicle.position.speed;
+          if (topic.includes("Lahti")) console.log(ms);
+          const lat = ms.vehicle.position.latitude;
+          const lon = ms.vehicle.position.longitude;
+          const routeId = ms.vehicle.trip?.route_id;
+          let route = GTFS.routeMap?.[routeId] || routeId || "?";
+          const angle = ((ms.vehicle.position?.bearing || 0) + 180) % 360;
+          let isTrain = false;
+          let isCommuterTrain = false;
+          if (routeId?.split("_").length === 5) {
+            isTrain = true;
+            const parts = route.split("_");
+            route = parts[2] || route;
+            id = id.split("_")[0] + parts[2] + "_" + parts[0] + "->" + parts[1];
+            //console.log(route);
+            if (isLetter(parts[2])) {
+              isCommuterTrain = true;
+            }
+          }
+          if (!isTrain || (isTrain && isCommuterTrain)) {
+            updateBus(id, lat, lon, route, isTrain, angle, label, speed);
+          }
+        });
+      } catch (e) {
+        console.log("decode error", e);
+      }
+    });
+
+    // ---------------------------
+    // 🔥 START
+    // ---------------------------
+    initCitySelector();
+    applyHash();
+    loadGTFS();
+
+  </script>
+
+</body>
+
+</html>

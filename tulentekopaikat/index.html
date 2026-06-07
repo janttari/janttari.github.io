@@ -1,0 +1,54 @@
+<!-- <!DOCTYPE html> -->
+<html>
+    <head>
+        <title>Tulentekopaikat</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+        <link rel="stylesheet" href="leaflet.css" />
+       <link rel="stylesheet" href="oma.css" />
+        <script src="js/leaflet.js" ></script>
+        <script type="text/javascript" src="dist/bundle.js"></script>
+        <script type="text/javascript" src="tulentekopaikka.js"></script> 
+
+    </head>
+    <body>
+       
+            <div id='map'></div> 
+      
+
+        <script>
+            var map = L.map('map', { zoomControl: false });
+            map.createPane('labels');
+            map.getPane('labels').style.zIndex = 650;
+            map.getPane('labels').style.pointerEvents = 'none';
+
+            var cartodbAttribution='';
+            var positron = L.tileLayer('https://tiles.kartat.kapsi.fi/peruskartta/{z}/{x}/{y}.jpg', {
+                attribution: cartodbAttribution }).addTo(map); 
+
+            var myStyle = {
+                "color": "#ff7800",
+                "weight": 5,
+               "opacity": 0.65
+            };
+            geojson = L.geoJson(tulentekopaikka,{style: myStyle}).addTo(map);
+            map.setView({ lat: 65.5, lng: 25.2 }, 6);
+        </script>
+        <br><br>
+
+
+            <select id="karttavalinta" onchange="vaihdaKartta()">
+                <option value='https://tiles.kartat.kapsi.fi/peruskartta/{z}/{x}/{y}.jpg'>kapsi</option>
+                <option value='https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'>light_nolabels</option>
+                <option value='https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'>base_light</option>
+            </select>
+           <br><br><br>
+           <font size="-3">
+           <a href="https://www.maanmittauslaitos.fi/kartat-ja-paikkatieto/asiantuntevalle-kayttajalle/tuotekuvaukset/maastotietokanta-0">Sisältää Maanmittauslaitoksen Maastotietokannan 09/2020 aineistoa.</a><br>
+           <a href="https://kartat.kapsi.fi/">kartat.kapsi.fi</a><br>
+           <a href="https://leafletjs.com/">leafletjs.com</a><br>
+           </font>
+        <script src="js/karttatoiminnot.js"> </script>
+    </body>
+</html>
