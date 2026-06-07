@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Bussikartta 0.19</title>
+  <title>Bussikartta 0.19.1</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -332,6 +332,9 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
+    //     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    //   attribution: '&copy; OpenStreetMap'
+    // }).addTo(map);
 
     // ---------------------------
     // 📦 DATA
@@ -346,7 +349,7 @@
     // 📥 GTFS LOAD
     // ---------------------------
     async function loadGTFS() {
-      const res = await fetch(CITY.zipFile);
+      const res = await fetch("zips/"+CITY.zipFile);
       const buffer = await res.arrayBuffer();
       const zip = await JSZip.loadAsync(buffer);
       GTFS.routes = Papa.parse(
@@ -419,7 +422,7 @@
             routeShort;
         });
         if (!routeLayers[normRoute(routeShort)])
-          routeLayers[normRoute(routeShort)]= [];
+          routeLayers[normRoute(routeShort)] = [];
 
         routeLayers[normRoute(routeShort)].push(line);
       }
