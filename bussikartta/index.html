@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Bussikartta (0.7)</title>
+  <title>Bussikartta 0.19</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -418,12 +418,16 @@
           document.getElementById("routeSelect").value =
             routeShort;
         });
-        if (!routeLayers[routeShort])
-          routeLayers[routeShort] = [];
+        if (!routeLayers[normRoute(routeShort)])
+          routeLayers[normRoute(routeShort)]= [];
 
-        routeLayers[routeShort].push(line);
+        routeLayers[normRoute(routeShort)].push(line);
       }
       fillRouteSelector();
+    }
+
+    function normRoute(r) {
+      return (r || "").trim().toUpperCase();
     }
 
     function fillRouteSelector() {
@@ -475,6 +479,7 @@
     }
 
     function highlightRoute(route) {
+      route = normRoute(route);
       //console.log(route);
       clearHighlight();
       selectedRoute = route;
@@ -493,7 +498,8 @@
     // ---------------------------
     // 🚌 UPDATE BUS (FADE ENABLED)
     // ---------------------------
-    function updateBus(id, lat, lon, route, isTrain = false, angle = 0, label = "", speed=0) {
+    //function updateBus(id, lat, lon, route, isTrain = false, angle = 0, label = "", speed=0) {
+    function updateBus(id, lat, lon, route, routeId, isTrain = false, angle = 0, label = "", speed = 0) {
       if (!lat || !lon) return;
       const now = Date.now();
       let icon;
@@ -535,8 +541,11 @@
       }
       if (!buses[id]) {
         const marker = L.marker([lat, lon], { icon }).addTo(busLayer);
-        marker.routeShort = route;
-        marker.on("click", () => {
+        //marker.routeShort = route; klikkausbugi
+        marker.routeShort = GTFS.routeMap?.[routeId] || route;
+        marker.on("click", (e) => {
+          //console.log(marker.routeShort);
+          L.DomEvent.stopPropagation(e);
           highlightRoute(marker.routeShort);
           //if (marker.routeShort) highlightRoute(marker.routeShort);
         });
@@ -641,7 +650,8 @@
             }
           }
           if (!isTrain || (isTrain && isCommuterTrain)) {
-            updateBus(id, lat, lon, route, isTrain, angle, label, speed);
+            //updateBus(id, lat, lon, route, isTrain, angle, label, speed);
+            updateBus(id, lat, lon, route, routeId, isTrain, angle, label, speed);
           }
         });
       } catch (e) {
