@@ -242,7 +242,7 @@
       buses = {};
       busLayer.clearLayers();
     }
-    function setCity(cityKey) {
+    async function setCity(cityKey) {
 
       CITY_KEY = cityKey;
       CITY = CITIES[cityKey];
@@ -255,7 +255,7 @@
       //buses = {};
       routeLayers = {};
       selectedRoute = null;
-      loadGTFS();
+      await loadGTFS();
       updateMqttSubscription();
     }
 
@@ -272,31 +272,25 @@
 
       sel.value = CITY_KEY;
 
-      sel.addEventListener("change", e => {
-        setCity(e.target.value);
+      sel.addEventListener("change", async e => {
+        await setCity(e.target.value);
         updateHash();
       });
     }
 
     function applyHash() {
-
       const hash = window.location.hash;
       if (!hash) return;
-
       const p = new URLSearchParams(hash.replace("#", ""));
-
       const city = p.get("city");
       const lat = parseFloat(p.get("lat"));
       const lon = parseFloat(p.get("lon"));
       const zoom = parseInt(p.get("zoom"));
-
       if (city && CITIES[city]) {
         CITY_KEY = city;
         CITY = CITIES[city];
-
         document.getElementById("citySelect").value = city;
       }
-
       if (!isNaN(lat) && !isNaN(lon)) {
         map.setView([lat, lon], zoom || CITY.zoom);
       } else {
@@ -308,6 +302,7 @@
     function isLetter(char) {
       return /^[A-Za-z]$/.test(char);
     }
+
     // ---------------------------
     // 🗺️ MAP
     // ---------------------------
@@ -320,15 +315,11 @@
     let busLayer = L.layerGroup().addTo(map);
     let routeLayerGroup = L.layerGroup().addTo(map);
     map.on("moveend", () => {
-
       clearTimeout(hashTimeout);
-
       hashTimeout = setTimeout(() => {
         updateHash();
       }, 150); // 100–300ms hyvä range
     });
-    //applyHash();
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
@@ -349,7 +340,7 @@
     // 📥 GTFS LOAD
     // ---------------------------
     async function loadGTFS() {
-      const res = await fetch("zips/"+CITY.zipFile);
+      const res = await fetch("zips/" + CITY.zipFile);
       const buffer = await res.arrayBuffer();
       const zip = await JSZip.loadAsync(buffer);
       GTFS.routes = Papa.parse(
@@ -423,7 +414,6 @@
         });
         if (!routeLayers[normRoute(routeShort)])
           routeLayers[normRoute(routeShort)] = [];
-
         routeLayers[normRoute(routeShort)].push(line);
       }
       fillRouteSelector();
@@ -435,34 +425,28 @@
 
     function fillRouteSelector() {
       const select = document.getElementById("routeSelect");
-
       // 🔥 tärkeä: estää vanhat eventit ja tyhjentää UI:n oikein
       select.onchange = null;
       select.innerHTML = '<option value="">Kaikki linjat</option>';
-
       const routes = Object.keys(routeLayers)
         .sort((a, b) =>
           a.localeCompare(b, undefined, { numeric: true })
         );
-
       for (const route of routes) {
         const opt = document.createElement("option");
         opt.value = route;
         opt.textContent = route;
         select.appendChild(opt);
       }
-
       // 🔥 tärkeä: uusi event handler aina puhtaasti
       select.onchange = (e) => {
         const value = e.target.value;
-
         if (!value) {
           clearHighlight();
         } else {
           highlightRoute(value);
         }
       };
-
       // 🔥 resetoi valinta turvallisesti
       select.value = "";
     }
@@ -620,7 +604,7 @@
       document.getElementById("status").innerText = "MQTT connected";
       client.subscribe("/gtfsrt/vp/digitraffic/#"); //junat
       mqttReady = true;
-      updateMqttSubscription();
+      //updateMqttSubscription();
     });
 
     client.on("message", (topic, message) => {
@@ -665,12 +649,16 @@
     // ---------------------------
     // 🔥 START
     // ---------------------------
-    initCitySelector();
-    applyHash();
-    loadGTFS();
+    (async () => {
+      initCitySelector();
+      applyHash();
+      await loadGTFS();
+      if (mqttReady) {
+        updateMqttSubscription();
+      }
+    })();
 
   </script>
-
 </body>
 
 </html>
